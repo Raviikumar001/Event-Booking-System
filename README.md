@@ -8,9 +8,9 @@ A Node.js + Express backend for a virtual event management platform using Postgr
 
 ## Goals
 - Implement secure authentication with role-based authorization (organizer vs attendee).
-- Manage events and participant lists fully in-memory.
+- Manage events and participant lists in PostgreSQL using Prisma.
 - Expose RESTful endpoints for users and events.
-- Send async email notifications for event registrations.
+- Send background notifications (console + email) for booking confirmation and event updates.
 
 ## Tech Stack
 - Runtime: Node.js (LTS)
@@ -79,10 +79,11 @@ virtual-event/
 
 ## Authentication & Authorization
 - Registration hashes passwords with bcrypt and stores users in Postgres Db.
+- Email is normalized (trim + lowercase) at registration/login to prevent duplicate accounts with case variants.
 - Login returns a signed JWT with claims: `userId`, `role`, sent Email after valid user registration.
 - Protected routes require `Authorization: Bearer <token>`.
 - Event CRUD is restricted to `role = organizer`.
-- Event registration is allowed for authenticated users.
+- Event registration is restricted to `role = attendee`.
 
 ## REST Endpoints
 Auth:
@@ -95,7 +96,7 @@ Events:
 - POST /events (organizers only)
 - PUT /events/:id (organizers only)
 - DELETE /events/:id (organizers only)
-- POST /events/:id/register (any authenticated user)
+- POST /events/:id/register (attendees only)
 
 ## Validation (zod schemas)
 - `RegisterInput`: email (email), password (min length), role (enum: organizer|attendee)
@@ -104,12 +105,13 @@ Events:
 - `UpdateEventInput`: same as create, all optional
 
 ## Email Notifications
-- On successful event registration, send an email to the attendee.
-- Use Nodemailer with Ethereal/Mailtrap for development to avoid real emails.
+- Background Task 1 (booking confirmation): on successful booking, enqueue async task that logs to console and sends booking confirmation email.
+- Background Task 2 (event update notification): on event update, enqueue async task that logs to console and emails all booked attendees.
+- Uses in-process async job queue (`src/core/job-queue.js`) and Nodemailer (Ethereal fallback in development).
 
 ## Async Operations
 - Use `async/await` across services and route handlers.
-- Email sending and token generation are handled as async tasks with proper error handling.
+- Background jobs are processed asynchronously via an in-process queue and do not block API responses.
 
 ## Environment Variables (.env)
 - JWT_SECRET: secret for JWT signing
@@ -166,7 +168,19 @@ npx prisma studio
 
 ```
 
+## Production Notes (Railway)
+
+- `docker-compose.yml` in this repo is for local development only (local Postgres on `localhost:5433`).
+- For Railway production deployment, set environment variables in Railway service settings:
+	- `DATABASE_URL` (from Railway Postgres service)
+	- `JWT_SECRET` (strong random secret)
+	- `APP_BASE_URL` (your Railway app URL)
+	- optional mail vars: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME`
+- The app now fails fast on startup/request if `DATABASE_URL` or `JWT_SECRET` are missing in production.
+
 ## Usage (API Examples)
+
+For a complete, copy-paste flow with expected outputs, see [docs/curl-requests.md](docs/curl-requests.md).
 
 Auth:
 - Register (returns user; dev may include email diagnostics)
@@ -199,14 +213,39 @@ Events:
 		-H "Authorization: Bearer YOUR_TOKEN" \
 		-H "Content-Type: application/json" \
 		-d '{"description":"Updated description"}'
+	# Response example:
+	# {
+	#   "updated": true,
+	#   "event": { "id": "...", "title": "Kickoff", "date": "2026-02-02", "time": "11:30" },
+	#   "backgroundNotification": { "queued": true, "recipientsCount": 1 }
+	# }
 
 - Delete event (organizer only)
 	curl -X DELETE http://localhost:3000/events/EVENT_ID \
 		-H "Authorization: Bearer YOUR_TOKEN"
+	# Response example: { "deleted": true, "eventId": "EVENT_ID" }
 
 - Register for event (attendee)
 	curl -X POST http://localhost:3000/events/EVENT_ID/register \
 		-H "Authorization: Bearer YOUR_TOKEN"
+	# Response example (new registration):
+	# {
+	#   "success": true,
+	#   "registered": true,
+	#   "status": "registered",
+	#   "message": "Ticket booked successfully for this event.",
+	#   "event": { "id": "...", "title": "Kickoff", "date": "2026-02-01", "time": "10:00" },
+	#   "backgroundConfirmation": { "queued": true }
+	# }
+	# Response example (already registered):
+	# {
+	#   "success": true,
+	#   "registered": false,
+	#   "status": "already-registered",
+	#   "message": "You are already registered for this event.",
+	#   "event": { "id": "...", "title": "Kickoff", "date": "2026-02-01", "time": "10:00" },
+	#   "backgroundConfirmation": { "queued": false }
+	# }
 
 Participants & Registrations:
 - List participants (organizer only)
