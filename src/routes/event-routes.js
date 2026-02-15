@@ -49,7 +49,14 @@ router.put('/events/:id', requireAuth, requireRole('ORGANIZER'), async (req, res
       eventTime: updatedEvent.time,
       recipients
     });
-    res.status(204).send();
+    res.status(200).json({
+      updated: true,
+      event: updatedEvent,
+      backgroundNotification: {
+        queued: true,
+        recipientsCount: recipients.length
+      }
+    });
   } catch (err) {
     next(err);
   }
@@ -57,8 +64,9 @@ router.put('/events/:id', requireAuth, requireRole('ORGANIZER'), async (req, res
 
 router.delete('/events/:id', requireAuth, requireRole('ORGANIZER'), async (req, res, next) => {
   try {
-    await deleteEvent(String(req.params.id), req.auth.userId);
-    res.status(204).send();
+    const eventId = String(req.params.id);
+    await deleteEvent(eventId, req.auth.userId);
+    res.status(200).json({ deleted: true, eventId });
   } catch (err) {
     next(err);
   }
@@ -67,11 +75,12 @@ router.delete('/events/:id', requireAuth, requireRole('ORGANIZER'), async (req, 
 router.post('/events/:id/register', requireAuth, requireRole('ATTENDEE'), async (req, res, next) => {
   try {
     const eventId = String(req.params.id);
-    await registerForEvent(eventId, req.auth.userId);
+    const registrationResult = await registerForEvent(eventId, req.auth.userId);
     const prisma = getPrisma();
     const user = await prisma.user.findUnique({ where: { id: req.auth.userId } });
-    const event = await prisma.event.findUnique({ where: { id: eventId } });
-    if (user && event) {
+    const event = registrationResult?.event || await prisma.event.findUnique({ where: { id: eventId } });
+    let queued = false;
+    if (registrationResult?.created && user && event) {
       enqueueJob(JOB_BOOKING_CONFIRMATION, {
         eventId,
         userEmail: user.email,
@@ -79,8 +88,27 @@ router.post('/events/:id/register', requireAuth, requireRole('ATTENDEE'), async 
         eventDate: event.date.toISOString().slice(0, 10),
         eventTime: event.time
       });
+      queued = true;
     }
-    res.status(200).json({ registered: true });
+    if (!event) throw Object.assign(new Error('Event not found'), { status: 404 });
+    const response = {
+      success: true,
+      registered: Boolean(registrationResult?.created),
+      status: registrationResult?.created ? 'registered' : 'already-registered',
+      message: registrationResult?.created
+        ? 'Ticket booked successfully for this event.'
+        : 'You are already registered for this event.',
+      event: {
+        id: event.id,
+        title: event.title,
+        date: event.date.toISOString().slice(0, 10),
+        time: event.time
+      },
+      backgroundConfirmation: {
+        queued
+      }
+    };
+    res.status(200).json(response);
   } catch (err) {
     next(err);
   }

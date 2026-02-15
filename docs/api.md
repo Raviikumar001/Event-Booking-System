@@ -87,19 +87,47 @@ POST /events
 PUT /events/:id
 - Auth: Organizer only.
 - Request (JSON): any subset of create fields.
-- Response 204.
+- Response 200:
+```json
+{
+  "updated": true,
+  "event": { "id": "uuid", "title": "Kickoff", "date": "2026-02-02", "time": "11:30" },
+  "backgroundNotification": { "queued": true, "recipientsCount": 1 }
+}
+```
 - Errors: 404 not found, 403 forbidden, 400 validation.
 
 DELETE /events/:id
 - Auth: Organizer only.
-- Response 204.
+- Response 200:
+```json
+{ "deleted": true, "eventId": "uuid" }
+```
 - Errors: 404 not found, 403 forbidden.
 
 POST /events/:id/register
 - Auth: Any authenticated user.
 - Response 200:
 ```json
-{ "registered": true, "emailPreviewUrl": "optional", "emailProvider": "optional", "emailError": "optional" }
+{
+  "success": true,
+  "registered": true,
+  "status": "registered",
+  "message": "Ticket booked successfully for this event.",
+  "event": { "id": "uuid", "title": "Kickoff", "date": "2026-02-01", "time": "10:00" },
+  "backgroundConfirmation": { "queued": true }
+}
+```
+- If already registered, response is still 200 and returns:
+```json
+{
+  "success": true,
+  "registered": false,
+  "status": "already-registered",
+  "message": "You are already registered for this event.",
+  "event": { "id": "uuid", "title": "Kickoff", "date": "2026-02-01", "time": "10:00" },
+  "backgroundConfirmation": { "queued": false }
+}
 ```
 - Errors: 404 event not found.
 

@@ -5,6 +5,7 @@ const { getPrisma } = require('../src/models/prisma-client');
 jest.mock('../src/core/email-service', () => ({
   sendRegistrationEmail: jest.fn().mockResolvedValue(undefined),
   sendWelcomeEmail: jest.fn().mockResolvedValue({ previewUrl: undefined }),
+  sendEventUpdatedEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('Participants & Registrations', () => {

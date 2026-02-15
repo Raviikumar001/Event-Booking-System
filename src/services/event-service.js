@@ -72,8 +72,9 @@ async function registerForEvent(eventId, userId) {
   const existing = await prisma.event.findUnique({ where: { id: eventId } });
   if (!existing) throw Object.assign(new Error('Event not found'), { status: 404 });
   const already = await prisma.registration.findUnique({ where: { eventId_userId: { eventId, userId } } });
-  if (already) return;
+  if (already) return { created: false, event: existing };
   await prisma.registration.create({ data: { eventId, userId } });
+  return { created: true, event: existing };
 }
 
 module.exports = { listEvents, getEventById, createEvent, updateEvent, deleteEvent, registerForEvent };

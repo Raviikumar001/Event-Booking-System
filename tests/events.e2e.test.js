@@ -5,7 +5,10 @@ const { getPrisma } = require('../src/models/prisma-client');
 jest.mock('../src/core/email-service', () => ({
   sendRegistrationEmail: jest.fn().mockResolvedValue(undefined),
   sendWelcomeEmail: jest.fn().mockResolvedValue({ previewUrl: undefined }),
+  sendEventUpdatedEmail: jest.fn().mockResolvedValue(undefined),
 }));
+
+const { sendEventUpdatedEmail } = require('../src/core/email-service');
 
 describe('Events E2E', () => {
   const app = createApp();
@@ -72,6 +75,45 @@ describe('Events E2E', () => {
       .set('Authorization', `Bearer ${attendeeToken}`)
       .send();
     expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
     expect(res.body.registered).toBe(true);
+    expect(res.body.status).toBe('registered');
+    expect(res.body.message).toBe('Ticket booked successfully for this event.');
+    expect(res.body.event.id).toBe(eventId);
+    expect(res.body.backgroundConfirmation.queued).toBe(true);
+  });
+
+  it('second registration returns already-registered response', async () => {
+    const res = await request(app)
+      .post(`/events/${eventId}/register`)
+      .set('Authorization', `Bearer ${attendeeToken}`)
+      .send();
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.registered).toBe(false);
+    expect(res.body.status).toBe('already-registered');
+    expect(res.body.message).toBe('You are already registered for this event.');
+    expect(res.body.backgroundConfirmation.queued).toBe(false);
+  });
+
+  it('organizer cannot register for event', async () => {
+    const res = await request(app)
+      .post(`/events/${eventId}/register`)
+      .set('Authorization', `Bearer ${organizerToken}`)
+      .send();
+    expect(res.status).toBe(403);
+  });
+
+  it('event update triggers attendee notification in background', async () => {
+    const res = await request(app)
+      .put(`/events/${eventId}`)
+      .set('Authorization', `Bearer ${organizerToken}`)
+      .send({ description: 'Updated schedule', date: '2026-02-02', time: '11:30' });
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toBe(true);
+    expect(res.body.event.id).toBe(eventId);
+    expect(res.body.backgroundNotification.queued).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(sendEventUpdatedEmail).toHaveBeenCalled();
   });
 });

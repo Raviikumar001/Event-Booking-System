@@ -5,6 +5,7 @@ const { getPrisma } = require('../src/models/prisma-client');
 jest.mock('../src/core/email-service', () => ({
   sendWelcomeEmail: jest.fn().mockResolvedValue({ previewUrl: undefined }),
   sendRegistrationEmail: jest.fn().mockResolvedValue(undefined),
+  sendEventUpdatedEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('Auth E2E', () => {
@@ -37,5 +38,13 @@ describe('Auth E2E', () => {
     expect(res.status).toBe(200);
     expect(res.body.token).toBeTruthy();
     expect(res.body.user.role).toBe('ORGANIZER');
+  });
+
+  it('rejects duplicate registration for same email across roles', async () => {
+    const res = await request(app)
+      .post('/register')
+      .send({ email: 'ORG@EXAMPLE.COM', password: 'StrongPass123', role: 'attendee' });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('Email already registered');
   });
 });
