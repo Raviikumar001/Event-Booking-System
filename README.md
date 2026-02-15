@@ -77,6 +77,35 @@ virtual-event/
 ```
 
 
+## Deployment & Docker
+The project includes a `Dockerfile` optimized for production and cloud platforms like Railway.
+
+### Automatic Migrations
+The `Dockerfile` is configured to run `npx prisma migrate deploy` automatically on startup. This ensures:
+1. The database schema is created if it doesn't exist.
+2. Any new migrations are applied before the server starts.
+3. The server only starts if migrations are successful.
+
+### Local Development
+1. Set up your `.env` file (copy from `.env.example`).
+2. Ensure `DATABASE_URL` points to your Neon (or local) Postgres instance.
+3. Apply migrations:
+   ```bash
+   npx prisma migrate dev
+   ```
+4. Run the app:
+   ```bash
+   npm run dev
+   ```
+
+### Production Deployment (Railway)
+1. Link your repo to Railway.
+2. Add the following environment variables in Railway:
+   - `DATABASE_URL`: Your Postgres connection string.
+   - `JWT_SECRET`: A long secure string.
+   - `PORT`: (Managed by Railway).
+3. Railway will pick up the `Dockerfile`, run the migrations, and start the app automatically.
+
 ## Authentication & Authorization
 - Registration hashes passwords with bcrypt and stores users in Postgres Db.
 - Email is normalized (trim + lowercase) at registration/login to prevent duplicate accounts with case variants.
@@ -117,7 +146,7 @@ Events:
 - JWT_SECRET: secret for JWT signing
 - EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS: SMTP credentials
 - APP_BASE_URL: e.g., http://localhost:3000
-- DATABASE_URL: Postgres connection string (Docker)
+- DATABASE_URL: Postgres connection string (e.g., Neon or Railway)
 - EMAIL_FROM: sender email (e.g., no-reply@yourdomain.com)
 - EMAIL_FROM_NAME: sender display name or an email (fallback when EMAIL_FROM not set)
 
