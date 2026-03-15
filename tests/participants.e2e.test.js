@@ -1,6 +1,7 @@
 const request = require('supertest');
 const { createApp } = require('../src/app');
 const { getPrisma } = require('../src/models/prisma-client');
+const { flushTestJobs } = require('../src/core/job-queue');
 
 jest.mock('../src/core/email-service', () => ({
   sendRegistrationEmail: jest.fn().mockResolvedValue(undefined),
@@ -9,6 +10,8 @@ jest.mock('../src/core/email-service', () => ({
 }));
 
 describe('Participants & Registrations', () => {
+  jest.setTimeout(15000);
+
   const app = createApp();
   const prisma = getPrisma();
 
@@ -39,9 +42,11 @@ describe('Participants & Registrations', () => {
       .post(`/events/${eventId}/register`)
       .set('Authorization', `Bearer ${attendeeToken}`)
       .send();
+    await flushTestJobs();
   });
 
   afterAll(async () => {
+    await flushTestJobs();
     await prisma.$disconnect();
   });
 

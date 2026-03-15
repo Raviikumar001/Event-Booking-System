@@ -1,7 +1,7 @@
 const { z } = require('zod');
 
 
-const RoleSchema = z.enum(['organizer', 'attendee']);
+const RoleSchema = z.enum(['organizer', 'attendee', 'customer']);
 
 const RegisterInput = z.object({
   email: z.string().email(),

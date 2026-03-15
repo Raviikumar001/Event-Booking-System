@@ -1,0 +1,138 @@
+@baseUrl = http://localhost:3000
+@organizerEmail = organizer.demo@example.com
+@organizerPassword = StrongPass123
+@customerEmail = customer.demo@example.com
+@customerPassword = StrongPass123
+
+###
+# Health check
+GET {{baseUrl}}/health
+
+###
+# Register organizer
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "email": "{{organizerEmail}}",
+  "password": "{{organizerPassword}}",
+  "role": "organizer"
+}
+
+###
+# Login organizer
+# Copy the token from the response into {{organizerToken}} below.
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "{{organizerEmail}}",
+  "password": "{{organizerPassword}}"
+}
+
+###
+@organizerToken = PASTE_ORGANIZER_TOKEN_HERE
+
+###
+# Register customer
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "email": "{{customerEmail}}",
+  "password": "{{customerPassword}}",
+  "role": "customer"
+}
+
+###
+# Login customer
+# Copy the token from the response into {{customerToken}} below.
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "{{customerEmail}}",
+  "password": "{{customerPassword}}"
+}
+
+###
+@customerToken = PASTE_CUSTOMER_TOKEN_HERE
+
+###
+# Create event as organizer
+# Copy the returned id into {{eventId}} below.
+POST {{baseUrl}}/events
+Authorization: Bearer {{organizerToken}}
+Content-Type: application/json
+
+{
+  "title": "Backend Assignment Event",
+  "description": "Initial event schedule",
+  "date": "2026-03-20",
+  "time": "10:00"
+}
+
+###
+@eventId = PASTE_EVENT_ID_HERE
+
+###
+# List events
+GET {{baseUrl}}/events
+Authorization: Bearer {{customerToken}}
+
+###
+# Get event by id
+GET {{baseUrl}}/events/{{eventId}}
+Authorization: Bearer {{customerToken}}
+
+###
+# Book event as customer
+POST {{baseUrl}}/events/{{eventId}}/register
+Authorization: Bearer {{customerToken}}
+
+###
+# Book same event again to verify already-registered flow
+POST {{baseUrl}}/events/{{eventId}}/register
+Authorization: Bearer {{customerToken}}
+
+###
+# Organizer booking attempt should fail with 403
+POST {{baseUrl}}/events/{{eventId}}/register
+Authorization: Bearer {{organizerToken}}
+
+###
+# Update event as organizer
+PUT {{baseUrl}}/events/{{eventId}}
+Authorization: Bearer {{organizerToken}}
+Content-Type: application/json
+
+{
+  "description": "Updated event schedule",
+  "date": "2026-03-21",
+  "time": "11:30"
+}
+
+###
+# List participants as organizer
+GET {{baseUrl}}/events/{{eventId}}/participants
+Authorization: Bearer {{organizerToken}}
+
+###
+# List current customer's registrations
+GET {{baseUrl}}/me/registrations
+Authorization: Bearer {{customerToken}}
+
+###
+# Optional: trigger test email as organizer
+POST {{baseUrl}}/admin/test-email
+Authorization: Bearer {{organizerToken}}
+Content-Type: application/json
+
+{
+  "to": "your-email@example.com"
+}
+
+###
+# Optional: delete event as organizer
+DELETE {{baseUrl}}/events/{{eventId}}
+Authorization: Bearer {{organizerToken}}

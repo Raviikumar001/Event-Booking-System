@@ -16,6 +16,7 @@ A Node.js + Express backend for a virtual event management platform using Postgr
 - Runtime: Node.js (LTS)
 - Framework: Express.js
 - Database: PostgreSQL (Docker)
+- Queue: BullMQ + Redis
 - ORM: Prisma (schema/migrations, PostgreSQL adapter)
 - Auth: bcrypt (password hashing), jsonwebtoken (JWT)
 - Email:(Resend)
@@ -112,7 +113,7 @@ The `Dockerfile` is configured to run `npx prisma migrate deploy` automatically 
 - Login returns a signed JWT with claims: `userId`, `role`, sent Email after valid user registration.
 - Protected routes require `Authorization: Bearer <token>`.
 - Event CRUD is restricted to `role = organizer`.
-- Event registration is restricted to `role = attendee`.
+- Event registration is restricted to `role = attendee` or `customer`.
 
 ## REST Endpoints
 Auth:
@@ -128,7 +129,7 @@ Events:
 - POST /events/:id/register (attendees only)
 
 ## Validation (zod schemas)
-- `RegisterInput`: email (email), password (min length), role (enum: organizer|attendee)
+- `RegisterInput`: email (email), password (min length), role (enum: organizer|attendee|customer)
 - `LoginInput`: email, password
 - `CreateEventInput`: title, description, date (YYYY-MM-DD), time (HH:mm)
 - `UpdateEventInput`: same as create, all optional
@@ -136,17 +137,18 @@ Events:
 ## Email Notifications
 - Background Task 1 (booking confirmation): on successful booking, enqueue async task that logs to console and sends booking confirmation email.
 - Background Task 2 (event update notification): on event update, enqueue async task that logs to console and emails all booked attendees.
-- Uses in-process async job queue (`src/core/job-queue.js`) and Nodemailer (Ethereal fallback in development).
+- Uses BullMQ with Redis in `src/core/job-queue.js` and Nodemailer (Ethereal fallback in development).
 
 ## Async Operations
 - Use `async/await` across services and route handlers.
-- Background jobs are processed asynchronously via an in-process queue and do not block API responses.
+- Background jobs are processed asynchronously via BullMQ workers and do not block API responses.
 
 ## Environment Variables (.env)
 - JWT_SECRET: secret for JWT signing
 - EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS: SMTP credentials
 - APP_BASE_URL: e.g., http://localhost:3000
 - DATABASE_URL: Postgres connection string (e.g., Neon or Railway)
+- REDIS_URL: Redis connection string used by BullMQ
 - EMAIL_FROM: sender email (e.g., no-reply@yourdomain.com)
 - EMAIL_FROM_NAME: sender display name or an email (fallback when EMAIL_FROM not set)
 
@@ -159,6 +161,7 @@ EMAIL_USER=your_user
 EMAIL_PASS=your_pass
 APP_BASE_URL=http://localhost:3000
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/virtual_event?schema=public
+REDIS_URL=redis://localhost:6379
 EMAIL_FROM=no-reply@yourdomain.com
 EMAIL_FROM_NAME=Virtual Event
 ```
@@ -202,6 +205,7 @@ npx prisma studio
 - `docker-compose.yml` in this repo is for local development only (local Postgres on `localhost:5433`).
 - For Railway production deployment, set environment variables in Railway service settings:
 	- `DATABASE_URL` (from Railway Postgres service)
+	- `REDIS_URL` (from Railway Redis service)
 	- `JWT_SECRET` (strong random secret)
 	- `APP_BASE_URL` (your Railway app URL)
 	- optional mail vars: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME`
@@ -295,4 +299,3 @@ Admin (dev/test):
 Notes:
 - Replace YOUR_TOKEN with the JWT from the login response.
 - Dates use YYYY-MM-DD; times use HH:mm.
-

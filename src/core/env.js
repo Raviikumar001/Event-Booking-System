@@ -6,13 +6,14 @@ function loadEnv() {
   const JWT_SECRET = String(process.env.JWT_SECRET || (isProduction ? '' : 'replace_me'));
   const APP_BASE_URL = String(process.env.APP_BASE_URL || 'http://localhost:3000');
   const DATABASE_URL = String(process.env.DATABASE_URL || '');
+  const REDIS_URL = String(process.env.REDIS_URL || '');
   if (!JWT_SECRET) {
     throw new Error('Missing required environment variable: JWT_SECRET');
   }
   if (!DATABASE_URL) {
     throw new Error('Missing required environment variable: DATABASE_URL');
   }
-  return { PORT, JWT_SECRET, APP_BASE_URL, DATABASE_URL };
+  return { PORT, JWT_SECRET, APP_BASE_URL, DATABASE_URL, REDIS_URL };
 }
 
 module.exports = { loadEnv };

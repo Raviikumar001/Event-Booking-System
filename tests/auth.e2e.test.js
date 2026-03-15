@@ -47,4 +47,13 @@ describe('Auth E2E', () => {
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('Email already registered');
   });
+
+  it('accepts customer as attendee-compatible role input', async () => {
+    const res = await request(app)
+      .post('/register')
+      .send({ email: 'customer@example.com', password: 'StrongPass123', role: 'customer' });
+    expect(res.status).toBe(201);
+    expect(res.body.user.email).toBe('customer@example.com');
+    expect(res.body.user.role).toBe('ATTENDEE');
+  });
 });

@@ -6,7 +6,9 @@ const { loadEnv } = require('../core/env');
 const SALT_ROUNDS = 10;
 
 function mapRole(roleLower) {
-  return roleLower === 'organizer' ? 'ORGANIZER' : 'ATTENDEE';
+  if (roleLower === 'organizer') return 'ORGANIZER';
+  if (roleLower === 'attendee' || roleLower === 'customer') return 'ATTENDEE';
+  throw Object.assign(new Error('Invalid role'), { status: 400 });
 }
 
 function normalizeEmail(email) {

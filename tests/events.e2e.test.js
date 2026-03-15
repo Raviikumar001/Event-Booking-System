@@ -1,6 +1,7 @@
 const request = require('supertest');
 const { createApp } = require('../src/app');
 const { getPrisma } = require('../src/models/prisma-client');
+const { flushTestJobs } = require('../src/core/job-queue');
 
 jest.mock('../src/core/email-service', () => ({
   sendRegistrationEmail: jest.fn().mockResolvedValue(undefined),
@@ -34,10 +35,10 @@ describe('Events E2E', () => {
       .expect(200);
     organizerToken = orgLogin.body.token;
 
-    // Register attendee
+    // Register customer/attendee
     await request(app)
       .post('/register')
-      .send({ email: 'user@example.com', password: 'StrongPass123', role: 'attendee' })
+      .send({ email: 'user@example.com', password: 'StrongPass123', role: 'customer' })
       .expect(201);
     const atLogin = await request(app)
       .post('/login')
@@ -47,6 +48,7 @@ describe('Events E2E', () => {
   });
 
   afterAll(async () => {
+    await flushTestJobs();
     await prisma.$disconnect();
   });
 
@@ -113,7 +115,7 @@ describe('Events E2E', () => {
     expect(res.body.updated).toBe(true);
     expect(res.body.event.id).toBe(eventId);
     expect(res.body.backgroundNotification.queued).toBe(true);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await flushTestJobs();
     expect(sendEventUpdatedEmail).toHaveBeenCalled();
   });
 });
